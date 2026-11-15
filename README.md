@@ -11,7 +11,7 @@ A four-wheel-drive buggy controlled from a phone browser over a Wi-Fi network ho
 - Craft sticks, glue, and motor mounting material (small brackets or zip ties)
 - Jumper wires
 
-The pin map is intended for the classic ESP32-WROOM-32 DevKit. It uses GPIO 4, 13, 16–19, 21–23, 25–27, and 32–33. GPIOs 34–39 are not used. If you add other hardware, check that it does not reuse these GPIOs. GPIO 16 and 17 are available on WROOM-32 modules; some other ESP32 variants reserve them for PSRAM.
+The pin map is intended for the classic ESP32-WROOM-32 DevKit. It uses GPIO 2 for the onboard status LED and GPIO 4, 13, 16–19, 21–23, 25–27, and 32–33 for the motor drivers. GPIOs 34–39 are not used. If you add other hardware, check that it does not reuse these GPIOs. GPIO 16 and 17 are available on WROOM-32 modules; some other ESP32 variants reserve them for PSRAM.
 
 ## Driver and motor wiring
 
@@ -44,6 +44,8 @@ Connect each motor to its channel's output pair:
 | Right rear | Right board `B01` and `B02` |
 
 For **both** driver boards, connect `VCC` (logic supply) to ESP32 `3V3`, and connect `GND` to ESP32 `GND`. Connect the motor battery positive to `VM` on both boards, and battery negative to driver `GND`. The ESP32, both drivers, and motor battery must share a common ground. Keep the ESP32 powered by USB while setting up. Never connect the motor battery to the ESP32 `3V3` pin, and do not power the motors from the ESP32.
+
+The Wi-Fi status indicator uses the onboard LED on GPIO 2, so no additional LED or resistor is needed. It blinks while no device is connected to the ESP32 access point and stays steadily on while at least one Wi-Fi client is connected. GPIO 2 is also an ESP32 boot-strapping pin; the sketch only drives it after startup. Onboard LED wiring can vary between DevKit revisions, so the LED may be absent or active-low on some boards; if it behaves oppositely, invert the `HIGH` and `LOW` writes in the LED section of the sketch.
 
 Choose the motor battery voltage for the specific BO motors you have, and confirm that each motor's stall current is within the TB6612FNG rating. If the motor supply is too high or the motors draw too much current, the drivers or motors can overheat.
 

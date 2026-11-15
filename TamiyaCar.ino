@@ -27,6 +27,8 @@ const uint8_t RF_IN1 = 25, RF_IN2 = 26, RF_PWM = 27;
 const uint8_t RR_IN1 = 32, RR_IN2 = 33, RR_PWM = 23;
 const uint8_t STBY_LEFT = 4;
 const uint8_t STBY_RIGHT = 13;
+const uint8_t WIFI_LED_PIN = 2; // DOIT DevKit V1 onboard LED, typically active HIGH
+const uint32_t WIFI_LED_BLINK_MS = 500;
 
 // Flip a motor's value to -1 if that wheel spins backward during a forward test.
 const int8_t LF_POLARITY = 1;
@@ -45,20 +47,23 @@ const char PAGE[] PROGMEM = R"HTML(
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#101820"><title>Tamiya Car</title>
 <style>
-:root{color-scheme:dark;--bg:#101820;--panel:#192832;--line:#30434d;--ink:#f3f6f4;--muted:#a8b7b9;--lime:#b7ef55;--orange:#ff9c46}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-body{margin:0;background:radial-gradient(ellipse at 50% -40%,#29404a,var(--bg) 65%);color:var(--ink);font:600 16px system-ui,-apple-system,sans-serif;min-height:100svh;display:grid;place-items:center;padding:clamp(10px,2.5vw,28px);user-select:none}
-.app{width:min(100%,1050px);display:grid;grid-template-columns:1fr minmax(160px,.65fr) 1fr;gap:clamp(12px,3vw,36px);align-items:center}
-header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:12px}
-.brand{display:flex;align-items:center;gap:11px}.badge{width:38px;height:38px;border-radius:12px;background:var(--lime);color:#15200e;display:grid;place-items:center;font-size:20px}.title{font-size:18px;letter-spacing:.08em;text-transform:uppercase}.sub{font-size:12px;color:var(--muted);font-weight:500;margin-top:2px}
-.status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}.dot{width:8px;height:8px;border-radius:50%;background:var(--orange);box-shadow:0 0 10px #ff9c4670}.dot.ok{background:var(--lime);box-shadow:0 0 10px #b7ef5570}
-.pad{background:#ffffff08;border:1px solid var(--line);border-radius:25px;padding:clamp(10px,2vw,20px);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,minmax(64px,1fr));gap:clamp(7px,1.5vw,14px);aspect-ratio:1.08}
-button{font:inherit;color:var(--ink);border:1px solid #465b64;background:linear-gradient(145deg,#263943,#1b2a32);border-radius:19px;box-shadow:0 5px 0 #0a1116,0 10px 18px #0003;display:grid;place-items:center;cursor:pointer;min-width:0;touch-action:none;transition:transform .08s,border-color .08s,background .08s}
-button .arrow{font-size:clamp(24px,5vw,40px);line-height:1}.label{font-size:10px;letter-spacing:.12em;color:var(--muted);margin-top:2px}.drive:active,.drive.held{transform:translateY(4px);box-shadow:0 1px 0 #0a1116;background:#384d4f;border-color:var(--lime)}
-.up{grid-column:2;grid-row:1}.left{grid-column:1;grid-row:2}.stop{grid-column:2;grid-row:2;background:#462e26;border-color:#765039;color:#ffd3ae;box-shadow:0 5px 0 #241913}.stop:active{transform:translateY(4px);box-shadow:0 1px 0 #241913}.right{grid-column:3;grid-row:2}.down{grid-column:2;grid-row:3}
-.center{display:flex;flex-direction:column;align-items:center;gap:12px}.car{width:min(100%,170px);aspect-ratio:1;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:radial-gradient(circle,#263942,#142129 70%);position:relative}.car:before,.car:after{content:"";position:absolute;left:8%;right:8%;height:10px;border-radius:8px;background:var(--lime);opacity:.8}.car:before{top:25%}.car:after{bottom:25%}.car svg{width:56%;z-index:1}.speed{width:100%;background:var(--panel);border:1px solid var(--line);padding:12px 14px;border-radius:16px}.speedrow{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-bottom:8px}input{width:100%;accent-color:var(--lime)}.note{font-size:11px;color:var(--muted);text-align:center;font-weight:500}
-@media(orientation:portrait){body{place-items:start center}.app{grid-template-columns:1fr 1fr;max-width:620px}.center{grid-column:1/-1;grid-row:2;flex-direction:row}.car{width:100px;flex:none}.speed{max-width:320px}.pad{grid-row:3;grid-column:1/-1;max-height:50vh}}
-@media(max-height:430px) and (orientation:landscape){body{padding:8px}.app{gap:12px}header{padding-bottom:6px}.pad{padding:9px;gap:7px;grid-template-rows:repeat(3,minmax(44px,1fr))}.car{max-width:125px}.speed{padding:8px 12px}}
+:root{color-scheme:dark;--bg:#101820;--panel:#1a2a33;--line:#344953;--ink:#f5f7f2;--muted:#aab9bb;--lime:#c2f36b;--orange:#ffad62}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;min-height:100%;margin:0}
+body{background:radial-gradient(ellipse at 50% -35%,#304954,var(--bg) 68%);color:var(--ink);font:600 16px/1.25 system-ui,-apple-system,sans-serif;min-height:100svh;display:grid;place-items:center;padding:clamp(10px,2.4vw,28px);user-select:none;overflow-x:hidden}
+.app{width:min(100%,1180px);display:grid;grid-template-columns:minmax(0,1.2fr) minmax(220px,.8fr);grid-template-rows:auto minmax(0,1fr) auto;gap:clamp(12px,2.2vw,26px);align-items:center}
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding:0 2px clamp(9px,1.5vh,15px)}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}.badge{width:clamp(34px,5vh,42px);height:clamp(34px,5vh,42px);flex:none;border-radius:12px;background:var(--lime);color:#15200e;display:grid;place-items:center;font-size:20px}.title{font-size:clamp(15px,2.2vh,19px);letter-spacing:.08em;text-transform:uppercase}.sub{font-size:clamp(10px,1.5vh,12px);color:var(--muted);font-weight:500;margin-top:3px}
+.status{font-size:clamp(11px,1.6vh,13px);color:var(--muted);display:flex;align-items:center;gap:8px;white-space:nowrap}.dot{width:9px;height:9px;flex:none;border-radius:50%;background:var(--orange);box-shadow:0 0 10px #ff9c4670}.dot.ok{background:var(--lime);box-shadow:0 0 10px #b7ef5570}
+.pad{width:100%;height:min(67svh,510px);min-height:250px;background:linear-gradient(145deg,#ffffff0b,#ffffff04);border:1px solid var(--line);border-radius:clamp(20px,3vw,30px);padding:clamp(10px,2vw,20px);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:clamp(8px,1.5vw,15px)}
+button{font:inherit;color:var(--ink);border:1px solid #4a606a;background:linear-gradient(145deg,#2a404a,#1c2c35);border-radius:clamp(14px,2vw,21px);box-shadow:0 4px 0 #0a1116,0 9px 18px #0003;display:grid;place-items:center;cursor:pointer;min-width:0;min-height:0;padding:5px;touch-action:none;transition:transform .08s,border-color .08s,background .08s,box-shadow .08s}
+button>span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(2px,.7vh,7px);line-height:1.1}.arrow{font-size:clamp(28px,7vh,48px);line-height:1}.label{font-size:clamp(9px,1.5vh,12px);letter-spacing:.1em;color:#c0cece;white-space:nowrap}.drive:active,.drive.held{transform:translateY(3px);box-shadow:0 1px 0 #0a1116;background:#354e53;border-color:var(--lime)}
+.up{grid-column:2;grid-row:1}.left{grid-column:1;grid-row:2}.stop{grid-column:2;grid-row:2;background:linear-gradient(145deg,#553b2d,#39271f);border-color:#936443;color:#ffe0c2;box-shadow:0 4px 0 #241913}.stop .label{color:#ffd3ae}.stop:active{transform:translateY(3px);box-shadow:0 1px 0 #241913}.right{grid-column:3;grid-row:2}.down{grid-column:2;grid-row:3}
+.center{height:min(67svh,510px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(16px,4vh,32px);padding:clamp(12px,2vw,24px);border:1px solid var(--line);border-radius:clamp(20px,3vw,30px);background:linear-gradient(155deg,#ffffff09,#ffffff03)}
+.car{width:clamp(112px,25vh,190px);aspect-ratio:1;flex:none;display:grid;place-items:center;border:1px solid #405761;border-radius:50%;background:radial-gradient(circle,#314852,#142129 72%);position:relative;box-shadow:inset 0 0 30px #0004,0 12px 28px #0003}.car:before,.car:after{content:"";position:absolute;left:8%;right:8%;height:9px;border-radius:8px;background:var(--lime);opacity:.8}.car:before{top:25%}.car:after{bottom:25%}.car svg{width:56%;z-index:1}
+.speed{width:min(100%,340px);background:#0d171c80;border:1px solid var(--line);padding:clamp(13px,2.2vh,20px) clamp(15px,2.2vw,24px);border-radius:18px}.speedrow{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:clamp(12px,1.7vh,14px);letter-spacing:.08em;margin-bottom:10px}.speedrow strong{color:var(--lime);font-size:1.1em;font-variant-numeric:tabular-nums}input{display:block;width:100%;height:28px;margin:0;accent-color:var(--lime);cursor:pointer;touch-action:pan-x}.note{grid-column:1/-1;font-size:clamp(10px,1.5vh,12px);color:var(--muted);text-align:center;font-weight:500;letter-spacing:.02em}
+@media(orientation:portrait){body{place-items:start center;padding:14px}.app{max-width:620px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto auto;gap:14px}.pad{grid-column:1/-1;grid-row:3;height:clamp(270px,43svh,430px);min-height:0}.center{grid-column:1/-1;grid-row:2;height:auto;min-height:128px;flex-direction:row;justify-content:space-evenly;gap:14px;padding:12px 16px}.car{width:clamp(82px,18vw,112px)}.speed{width:min(65%,360px)}.note{grid-row:4}}
+@media(max-height:480px) and (orientation:landscape){body{padding:8px 16px}.app{gap:9px 18px}.pad{height:min(68svh,340px);min-height:0;padding:9px;gap:8px}.center{height:min(68svh,340px);gap:12px;padding:10px}.car{width:clamp(88px,20vh,125px)}.speed{padding:9px 14px}.speedrow{margin-bottom:4px}input{height:24px}.note{font-size:10px}}
 </style></head><body><main class="app">
 <header><div class="brand"><div class="badge">✦</div><div><div class="title">Tamiya Buggy</div><div class="sub">Four-wheel drive · live control</div></div></div><div class="status"><i class="dot" id="dot"></i><span id="status">Connecting…</span></div></header>
 <section class="pad" aria-label="Driving controls">
@@ -131,6 +136,8 @@ void handleCommand() {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(WIFI_LED_PIN, OUTPUT);
+  digitalWrite(WIFI_LED_PIN, LOW);
   uint8_t pins[] = {LF_IN1, LF_IN2, LF_PWM, LR_IN1, LR_IN2, LR_PWM,
                     RF_IN1, RF_IN2, RF_PWM, RR_IN1, RR_IN2, RR_PWM,
                     STBY_LEFT, STBY_RIGHT};
@@ -152,4 +159,15 @@ void setup() {
 void loop() {
   server.handleClient();
   if (moving && millis() - lastCommandAt > COMMAND_TIMEOUT_MS) stopCar();
+
+  static uint32_t lastLedToggleAt = 0;
+  static bool ledOn = false;
+  if (WiFi.softAPgetStationNum() > 0) {
+    ledOn = true;
+    digitalWrite(WIFI_LED_PIN, HIGH);
+  } else if (millis() - lastLedToggleAt >= WIFI_LED_BLINK_MS) {
+    lastLedToggleAt = millis();
+    ledOn = !ledOn;
+    digitalWrite(WIFI_LED_PIN, ledOn ? HIGH : LOW);
+  }
 }
