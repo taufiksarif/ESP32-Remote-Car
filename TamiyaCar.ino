@@ -38,7 +38,13 @@ const int8_t RR_POLARITY = -1;
 
 const uint32_t COMMAND_TIMEOUT_MS = 700;
 WebServer server(80);
-int currentSpeed = 190; // 0..255
+int currentSpeed = 191; // PWM equivalent of the default 75% UI setting
+int turnStrength = 100; // 0 = straight / no differential, 100 = pivot turn
+int leftOutputSpeed = 0;
+int rightOutputSpeed = 0;
+int leftTargetSpeed = 0;
+int rightTargetSpeed = 0;
+uint32_t lastRampAt = 0;
 uint32_t lastCommandAt = 0;
 bool moving = false;
 
@@ -61,7 +67,7 @@ button>span{display:flex;flex-direction:column;align-items:center;justify-conten
 .up{grid-column:2;grid-row:1}.left{grid-column:1;grid-row:2}.stop{grid-column:2;grid-row:2;background:linear-gradient(145deg,#553b2d,#39271f);border-color:#936443;color:#ffe0c2;box-shadow:0 4px 0 #241913}.stop .label{color:#ffd3ae}.stop:active{transform:translateY(3px);box-shadow:0 1px 0 #241913}.right{grid-column:3;grid-row:2}.down{grid-column:2;grid-row:3}
 .center{height:min(67svh,510px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(16px,4vh,32px);padding:clamp(12px,2vw,24px);border:1px solid var(--line);border-radius:clamp(20px,3vw,30px);background:linear-gradient(155deg,#ffffff09,#ffffff03)}
 .car{width:clamp(112px,25vh,190px);aspect-ratio:1;flex:none;display:grid;place-items:center;border:1px solid #405761;border-radius:50%;background:radial-gradient(circle,#314852,#142129 72%);position:relative;box-shadow:inset 0 0 30px #0004,0 12px 28px #0003}.car:before,.car:after{content:"";position:absolute;left:8%;right:8%;height:9px;border-radius:8px;background:var(--lime);opacity:.8}.car:before{top:25%}.car:after{bottom:25%}.car svg{width:56%;z-index:1}
-.speed{width:min(100%,340px);background:#0d171c80;border:1px solid var(--line);padding:clamp(13px,2.2vh,20px) clamp(15px,2.2vw,24px);border-radius:18px}.speedrow{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:clamp(12px,1.7vh,14px);letter-spacing:.08em;margin-bottom:10px}.speedrow strong{color:var(--lime);font-size:1.1em;font-variant-numeric:tabular-nums}input{display:block;width:100%;height:28px;margin:0;accent-color:var(--lime);cursor:pointer;touch-action:pan-x}.note{grid-column:1/-1;font-size:clamp(10px,1.5vh,12px);color:var(--muted);text-align:center;font-weight:500;letter-spacing:.02em}
+.speed{width:min(100%,340px);background:#0d171c80;border:1px solid var(--line);padding:clamp(13px,2.2vh,20px) clamp(15px,2.2vw,24px);border-radius:18px}.speedrow{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:clamp(12px,1.7vh,14px);letter-spacing:.08em;margin-bottom:4px}.speedrow strong{color:var(--lime);font-size:1.1em;font-variant-numeric:tabular-nums}.sliderGroup+.sliderGroup{margin-top:9px;padding-top:8px;border-top:1px solid #344953}.sliderGroup input{display:block;width:100%;height:25px;margin:0;accent-color:var(--lime);cursor:pointer;touch-action:pan-x}.rangeEnds{display:flex;justify-content:space-between;color:var(--muted);font-size:10px;font-weight:500;margin-top:-2px}.note{grid-column:1/-1;font-size:clamp(10px,1.5vh,12px);color:var(--muted);text-align:center;font-weight:500;letter-spacing:.02em}
 @media(orientation:portrait){body{place-items:start center;padding:14px}.app{max-width:620px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto auto;gap:14px}.pad{grid-column:1/-1;grid-row:3;height:clamp(270px,43svh,430px);min-height:0}.center{grid-column:1/-1;grid-row:2;height:auto;min-height:128px;flex-direction:row;justify-content:space-evenly;gap:14px;padding:12px 16px}.car{width:clamp(82px,18vw,112px)}.speed{width:min(65%,360px)}.note{grid-row:4}}
 @media(max-height:480px) and (orientation:landscape){body{padding:8px 16px}.app{gap:9px 18px}.pad{height:min(68svh,340px);min-height:0;padding:9px;gap:8px}.center{height:min(68svh,340px);gap:12px;padding:10px}.car{width:clamp(88px,20vh,125px)}.speed{padding:9px 14px}.speedrow{margin-bottom:4px}input{height:24px}.note{font-size:10px}}
 </style></head><body><main class="app">
@@ -72,15 +78,15 @@ button>span{display:flex;flex-direction:column;align-items:center;justify-conten
 <button class="stop" id="stop" aria-label="Stop"><span><span class="arrow">■</span><span class="label">STOP</span></span></button>
 <button class="drive right" data-cmd="right" aria-label="Turn right"><span><span class="arrow">→</span><span class="label">RIGHT</span></span></button>
 <button class="drive down" data-cmd="reverse" aria-label="Reverse"><span><span class="arrow">↓</span><span class="label">REVERSE</span></span></button></section>
-<section class="center"><div class="car" aria-hidden="true"><svg viewBox="0 0 100 130"><path d="M28 8h44l8 21 11 19v51l-11 19H20L9 99V48l11-19z" fill="#b7ef55"/><path d="M30 25h40l8 21H22zm-8 51h56v22H22z" fill="#18262d"/><circle cx="27" cy="57" r="5" fill="#ff9c46"/><circle cx="73" cy="57" r="5" fill="#ff9c46"/></svg></div><div class="speed"><div class="speedrow"><span>SPEED</span><strong id="speedval">75%</strong></div><input id="speed" type="range" min="25" max="100" value="75" aria-label="Speed"></div></section>
-<div class="note">Press and hold to drive · release to stop</div>
+<section class="center"><div class="car" aria-hidden="true"><svg viewBox="0 0 100 130"><path d="M28 8h44l8 21 11 19v51l-11 19H20L9 99V48l11-19z" fill="#b7ef55"/><path d="M30 25h40l8 21H22zm-8 51h56v22H22z" fill="#18262d"/><circle cx="27" cy="57" r="5" fill="#ff9c46"/><circle cx="73" cy="57" r="5" fill="#ff9c46"/></svg></div><div class="speed"><div class="sliderGroup"><div class="speedrow"><span>SPEED</span><strong id="speedval">75%</strong></div><input id="speed" type="range" min="25" max="100" value="75" aria-label="Speed"></div><div class="sliderGroup"><div class="speedrow"><span>TURN STRENGTH</span><strong id="turnval">100%</strong></div><input id="turn" type="range" min="0" max="100" value="100" aria-label="Turn strength"><div class="rangeEnds"><span>STRAIGHT</span><span>PIVOT</span></div></div></div></section>
+<div class="note">Press and hold to drive · release for a smooth stop</div>
 </main><script>
-const statusEl=document.querySelector('#status'),dot=document.querySelector('#dot'),speed=document.querySelector('#speed');let active=null,timer=null;
-async function send(cmd){try{const r=await fetch(`/cmd?move=${cmd}&speed=${speed.value}`,{cache:'no-store'});if(!r.ok)throw 0;statusEl.textContent='Connected';dot.classList.add('ok')}catch(e){statusEl.textContent='Reconnecting';dot.classList.remove('ok')}}
+const statusEl=document.querySelector('#status'),dot=document.querySelector('#dot'),speed=document.querySelector('#speed'),turn=document.querySelector('#turn');let active=null,timer=null;
+async function send(cmd){try{const r=await fetch(`/cmd?move=${cmd}&speed=${speed.value}&turn=${turn.value}`,{cache:'no-store'});if(!r.ok)throw 0;statusEl.textContent='Connected';dot.classList.add('ok')}catch(e){statusEl.textContent='Reconnecting';dot.classList.remove('ok')}}
 function stop(){if(timer){clearInterval(timer);timer=null}document.querySelectorAll('.held').forEach(b=>b.classList.remove('held'));if(active){active=null;send('stop')}}
 document.querySelectorAll('.drive').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();stop();active=b.dataset.cmd;b.classList.add('held');send(active);timer=setInterval(()=>active&&send(active),180)});['pointerup','pointercancel','pointerleave','lostpointercapture'].forEach(ev=>b.addEventListener(ev,stop))});
 document.querySelector('#stop').addEventListener('pointerdown',e=>{e.preventDefault();stop();send('stop')});window.addEventListener('blur',stop);document.addEventListener('visibilitychange',()=>document.hidden&&stop());
-speed.addEventListener('input',()=>{document.querySelector('#speedval').textContent=speed.value+'%';if(active)send(active)});send('stop');
+speed.addEventListener('input',()=>{document.querySelector('#speedval').textContent=speed.value+'%';if(active)send(active)});turn.addEventListener('input',()=>{document.querySelector('#turnval').textContent=turn.value+'%';if(active)send(active)});send('stop');
 </script></body></html>
 )HTML";
 
@@ -92,44 +98,69 @@ Motor motors[] = {
   {RR_IN1, RR_IN2, RR_PWM, RR_POLARITY}
 };
 
-void setMotor(const Motor &m, int direction, int speed) {
-  direction *= m.polarity;
-  if (direction == 0 || speed == 0) {
+void setMotor(const Motor &m, int signedSpeed) {
+  signedSpeed *= m.polarity;
+  if (signedSpeed == 0) {
     digitalWrite(m.in1, LOW);
     digitalWrite(m.in2, LOW);
     analogWrite(m.pwm, 0);
     return;
   }
-  digitalWrite(m.in1, direction > 0 ? HIGH : LOW);
-  digitalWrite(m.in2, direction > 0 ? LOW : HIGH);
-  analogWrite(m.pwm, speed);
+  digitalWrite(m.in1, signedSpeed > 0 ? HIGH : LOW);
+  digitalWrite(m.in2, signedSpeed > 0 ? LOW : HIGH);
+  analogWrite(m.pwm, abs(signedSpeed));
 }
 
-void drive(int leftDirection, int rightDirection) {
-  digitalWrite(STBY_LEFT, HIGH);
-  digitalWrite(STBY_RIGHT, HIGH);
-  setMotor(motors[0], leftDirection, currentSpeed);
-  setMotor(motors[1], leftDirection, currentSpeed);
-  setMotor(motors[2], rightDirection, currentSpeed);
-  setMotor(motors[3], rightDirection, currentSpeed);
-  moving = leftDirection != 0 || rightDirection != 0;
+void drive(int leftSpeed, int rightSpeed) {
+  leftTargetSpeed = constrain(leftSpeed, -255, 255);
+  rightTargetSpeed = constrain(rightSpeed, -255, 255);
+  if (leftTargetSpeed != 0 || rightTargetSpeed != 0 || leftOutputSpeed != 0 || rightOutputSpeed != 0) {
+    digitalWrite(STBY_LEFT, HIGH);
+    digitalWrite(STBY_RIGHT, HIGH);
+  }
+  moving = leftTargetSpeed != 0 || rightTargetSpeed != 0 || leftOutputSpeed != 0 || rightOutputSpeed != 0;
 }
 
 void stopCar() {
-  for (const Motor &m : motors) setMotor(m, 0, 0);
+  leftTargetSpeed = rightTargetSpeed = 0;
+  leftOutputSpeed = rightOutputSpeed = 0;
+  for (const Motor &m : motors) setMotor(m, 0);
   digitalWrite(STBY_LEFT, LOW);
   digitalWrite(STBY_RIGHT, LOW);
   moving = false;
 }
 
+int rampToward(int current, int target) {
+  const int RAMP_STEP = 12;
+  if (current < target) return min(current + RAMP_STEP, target);
+  if (current > target) return max(current - RAMP_STEP, target);
+  return current;
+}
+
+void updateMotorRamp() {
+  if (!moving) return;
+  if (millis() - lastRampAt < 15) return;
+  lastRampAt = millis();
+  leftOutputSpeed = rampToward(leftOutputSpeed, leftTargetSpeed);
+  rightOutputSpeed = rampToward(rightOutputSpeed, rightTargetSpeed);
+  setMotor(motors[0], leftOutputSpeed);
+  setMotor(motors[1], leftOutputSpeed);
+  setMotor(motors[2], rightOutputSpeed);
+  setMotor(motors[3], rightOutputSpeed);
+  moving = leftTargetSpeed != 0 || rightTargetSpeed != 0 || leftOutputSpeed != 0 || rightOutputSpeed != 0;
+  if (!moving) stopCar();
+}
+
 void handleCommand() {
-  if (server.hasArg("speed")) currentSpeed = constrain(server.arg("speed").toInt(), 0, 255);
+  if (server.hasArg("speed")) currentSpeed = constrain(server.arg("speed").toInt(), 25, 100) * 255 / 100;
+  if (server.hasArg("turn")) turnStrength = constrain(server.arg("turn").toInt(), 0, 100);
   String move = server.arg("move");
-  if (move == "forward") drive(1, 1);
-  else if (move == "reverse") drive(-1, -1);
-  else if (move == "left") drive(-1, 1);
-  else if (move == "right") drive(1, -1);
-  else stopCar();
+  int innerSpeed = currentSpeed * (100 - 2 * turnStrength) / 100;
+  if (move == "forward") drive(currentSpeed, currentSpeed);
+  else if (move == "reverse") drive(-currentSpeed, -currentSpeed);
+  else if (move == "left") drive(innerSpeed, currentSpeed);
+  else if (move == "right") drive(currentSpeed, innerSpeed);
+  else drive(0, 0);
   lastCommandAt = millis();
   server.send(200, "text/plain", "OK");
 }
@@ -145,6 +176,12 @@ void setup() {
   stopCar();
 
   WiFi.mode(WIFI_AP);
+  IPAddress apIP(10, 10, 10, 10);
+  IPAddress gateway(10, 10, 10, 10);
+  IPAddress subnet(255, 255, 255, 0);
+  if (!WiFi.softAPConfig(apIP, gateway, subnet)) {
+    Serial.println("Warning: failed to configure AP IP address");
+  }
   WiFi.softAP(AP_SSID, AP_PASSWORD);
   Serial.print("Join Wi-Fi: "); Serial.println(AP_SSID);
   Serial.print("Open: http://"); Serial.println(WiFi.softAPIP());
@@ -159,6 +196,7 @@ void setup() {
 void loop() {
   server.handleClient();
   if (moving && millis() - lastCommandAt > COMMAND_TIMEOUT_MS) stopCar();
+  updateMotorRamp();
 
   static uint32_t lastLedToggleAt = 0;
   static bool ledOn = false;

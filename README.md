@@ -69,11 +69,11 @@ This sketch does not create its own FreeRTOS tasks. The Arduino ESP32 core runs 
 ## Connect and drive
 
 1. On the phone, join Wi-Fi **Tamiya Car** with password **12345678**.
-2. Open **http://192.168.4.1** in a browser. The usual ESP32 AP address is `192.168.4.1`; the actual address is also printed in Serial Monitor.
+2. Open **http://10.10.10.10** in a browser. The ESP32 access point is configured to use `10.10.10.10` with subnet mask `255.255.255.0`.
 3. Rotate the phone to landscape for the intended control layout.
-4. Press and hold **Forward**, **Reverse**, **Left**, or **Right**. Release to stop. Use the center **Stop** button for an immediate stop; the speed slider controls motor PWM from 25% to 100%.
+4. Press and hold **Forward**, **Reverse**, **Left**, or **Right**. Releasing a direction or pressing **Stop** smoothly ramps the motors down. The speed slider controls the target motor PWM from 25% to 100%.
 
-Forward and reverse drive all four wheels in the same direction. Left and right use skid steering: the wheels on one side run forward while the wheels on the other side run backward. If the browser stops sending commands for 700 ms, the ESP32 stops the motors.
+Forward and reverse drive all four wheels in the same direction. The firmware ramps motor speed up and down to reduce abrupt starts and stops. The **Turn Strength** slider controls the inner wheels during a turn: **0%** drives both sides equally (straight), low settings make a wide arc, **50%** stops the inner side, and **100%** gives the original pivot turn with one side reversing. If the browser stops sending commands for 700 ms, the ESP32 disables the drivers immediately as a failsafe.
 
 ## First power-on and direction adjustment
 
